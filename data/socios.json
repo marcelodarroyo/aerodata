@@ -1,0 +1,1 @@
+{"description":"Socios","fields":["id","nombre","DNI","direccion","tipo","ingreso","licencia"],"data":[[1,"Marcelo Arroyo","17663593","Las Higueras",2,"2018-07-26","PPA 34343343"],[2,"Fipi","43443434","Huinca",2,"2018-07-27","PPA 45545554"],[3,"José Luis Seco","134546656","Huinca",2,"2018-07-27","PPA 45454345"]]}

@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<title>Aero Gestión</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<script src="lib/jquery-3.1.1.min.js"></script>
+<script type="text/javascript" src="lib/w2ui.min.js"></script>
+<script type="text/javascript" src="lib/es-ar.js"></script>
+
+<link rel="stylesheet" type="text/css" href="css/w2ui.min.css"/>
+</head>
+
+<body>
+
+<div id="mainLayout" style="position: relative; width: 100%; height: 100vh"></div>
+
+<script type="text/javascript">
+
+var tiposSocio = [
+    { id: 1, text: "Piloto" },
+    { id: 2, text: "Alumno piloto" },
+    { id: 3, text: "Socio" },
+    { id: 4, text: "Cliente/Proveedor" },
+];
+
+var listaSocios = [ {id: 1, text: 'vacío'} ];
+
+function updateListaSocios() {
+    console.log('updating lista socios...');
+
+    listaSocios = [];
+    for (let s of w2ui['socios'].records) {
+        console.log('  pushing ' + s.recid + ' ' + s.nombre);
+        listaSocios.push({ id: s.recid, text: s.nombre });
+    }
+
+    // update columna 'socio/piloto' de vuelos y movimientos
+    w2ui.vuelos.getColumn('piloto').editable = {type: 'list', items: listaSocios};
+    w2ui.vuelos.refresh();
+
+    w2ui.movs.getColumn('socio').editable = {type: 'list', items: listaSocios};
+    w2ui.movs.refresh();
+}
+
+var listaAviones = [
+    { id: 1, text: "LV-YRE" },
+    { id: 2, text: "LV-MIR" },
+    { id: 3, text: "LV-GZG"},
+    { id: 4, text: "Otro"}
+];
+
+var tiposVuelo = [
+    { id: 1, text: "Piloto" },
+    { id: 2, text: "Con instructor" },
+    { id: 3, text: "Alumno piloto" },
+    { id: 4, text: "Bautismo" },
+    { id: 5, text: "Terceros" },
+];
+
+var conceptos = [
+    { id: 1, text: "Vuelo LV-YRE" },
+    { id: 2, text: "Vuelo LV-MIR" },
+    { id: 3, text: "Vuelo LV-GZG" },
+    { id: 4, text: "Combustible" },
+    { id: 5, text: "Cuota social"},
+    { id: 6, text: "Mantenimiento avión"},
+    { id: 5, text: "Otro"}
+];
+
+//=============================================================================
+// On load, create user interface (layout, grids and forms)
+//=============================================================================
+$(function () {
+    var pstyle = 'background-color: #F5F6F7; border: 1px solid #dfdfdf; padding: 5px;',
+        initialImg = '<img src="img/aero.jpg" />';
+
+    w2utils.locale(es);
+
+    $('#mainLayout').w2layout({
+        name: 'layout',
+        panels: [
+            { type: 'top',  size: 50, resizable: true, style: pstyle,
+              content: '<h2>Aeroclub Huinca Renancó</h2>' },
+            { type: 'left', size: '15%', resizable: true, style: pstyle },
+            { type: 'main', size: '100%', style: pstyle, content: initialImg},
+            { type: 'bottom', size: 50, resizable: true, style: pstyle, content: '' }
+        ]
+    });
+
+    //=========================================================================
+    // Sidebar: opciones
+    //=========================================================================
+    w2ui.layout.content('left', $().w2sidebar({
+        name: 'menu',
+        nodes: [
+            { id: 'socios', text: 'Socios/Prov', img: 'icon-folder', onClick: showSocios },
+            { id: 'vuelos', text: 'Vuelos', img: 'icon-folder', onClick: showVuelos },
+            { id: 'tarifas', text: 'Tarifas', img: 'icon-folder', onClick: showTarifas },
+            { id: 'movs', text: 'Movimientos', img: 'icon-folder', onClick: showMovs },
+            { id: 'ctacte', text: 'Ctas. Ctes.', img: 'icon-folder', onClick: showSaldos }
+        ],
+    }));
+
+    //=========================================================================
+    // Socios
+    //=========================================================================
+    $().w2grid({
+        name: 'socios',
+        header: 'Socios / Clientes / Proveedores',
+        show: { header: true, toolbar: true, footer: true, toolbarAdd: true, toolbarDelete: true,
+                toolbarSave: true },
+        searches: [{ field: 'nombre', caption: 'Apellido', type: 'text' }],
+        sortData: [{ field: 'nombre', direction: 'ASC' }],
+        onAdd: addRecord,
+        onSave: saveChanges,
+        onDelete: deleteRecord,
+        columns: [
+            { field: 'nombre', caption: 'Apellido y nombres', size: '30%', sortable: true,
+              resizable: true, sortable: true, editable: {type: 'text'} },
+            { field: 'dni', caption: 'D.N.I.', size: '10%', resizable: true,
+              editable: {type: 'number'} },
+            { field: 'licencia', caption: 'Licencia', size: '10%', resizable: true,
+              editable: {type: 'text'} },
+            { field: 'email', caption: 'Email', size: '40%', resizable: true,
+              editable: {type:'text'} },
+            { field: 'desde', caption: 'Desde', size: '120px', resizable: true,
+              editable: {type: 'date'} },
+            { field: 'tipo', caption: 'Tipo', size: '120px', resizable: true,
+              editable: { type: 'list', items: tiposSocio } },
+        ],
+        records: []
+    });
+
+    //=========================================================================
+    // Vuelos
+    //=========================================================================
+    $().w2grid({
+        name: 'vuelos',
+        header: 'Vuelos',
+        show: { header: true, toolbar: true, footer: true, toolbarAdd: true, toolbarDelete: true,
+                toolbarSave: true },
+        searches: [{ field: 'piloto', caption: 'Apellido', type: 'text' },
+                   { field: 'desde', direction: 'ASC'}],
+        sortData: [{ field: 'piloto', direction: 'ASC' }, { field: 'desde', direction: 'ASC'}],
+        onAdd: addRecord,
+        onSave: saveChanges,
+        onDelete: deleteRecord,
+        columns: [
+            { field: 'aeronave', caption: 'Aeronave', size: '10%', sortable: true,
+              resizable: true, editable: {type: 'list', items: listaAviones} },
+            { field: 'piloto', caption: 'Piloto', size: '25%', sortable: true,
+              resizable: true, editable: {type: 'list', items: listaSocios} },
+            { field: 'tipovuelo', caption: 'Tipo vuelo', size: '10%', sortable: true,
+              resizable: true, editable: {type: 'list', items: tiposVuelo} },
+            { field: 'desde', caption: 'Desde', size: '10%', resizable: true,
+              editable: {type: 'text'} },
+            { field: 'hasta', caption: 'Hasta', size: '10%', resizable: true,
+              editable: {type: 'text'} },
+            { field: 'salida', caption: 'Hora salida', size: '15%', resizable: true,
+              editable: {type: 'datetime'} },
+            { field: 'llegada', caption: 'Hora llegada', size: '15%', resizable: true,
+              editable: {type: 'datetime'} },
+            { field: 'duracion', caption: 'Duración', size: '10%', resizable: true,
+              editable: {type: 'number'}, render: 'float:1' },
+        ],
+        records: []
+    });
+
+    //=========================================================================
+    // Tarifas
+    //=========================================================================
+    $().w2grid({
+        name: 'tarifas',
+        header: 'Tarifas',
+        show: { header: true, toolbar: true, footer: true, toolbarAdd: true, toolbarDelete: true,
+                toolbarSave: true },
+        onAdd: addRecord,
+        onSave: saveChanges,
+        onDelete: deleteRecord,
+        columns: [
+            { field: 'aeronave', caption: 'Aeronave', size: '25%', sortable: true,
+              resizable: true, editable: {type: 'list', items: listaAviones} },
+            { field: 'tipovuelo', caption: 'Tipo vuelo', size: '25%', sortable: true,
+              resizable: true, editable: {type: 'list', items: tiposVuelo} },
+            { field: 'vigente', caption: 'Vigente desde', size: '25%', resizable: true,
+              editable: {type: 'date'} },
+            { field: 'importe', caption: 'Importe (hora)', size: '25%', resizable: true,
+              editable: {type: 'number'}, render: 'float:2'}
+        ],
+        records: []
+    });
+
+    //=========================================================================
+    // Movimientos
+    //=========================================================================
+    $().w2grid({
+        name: 'movs',
+        header: 'Movimientos',
+        show: { header: true, toolbar: true, footer: true, toolbarAdd: true, toolbarDelete: true,
+                toolbarSave: true },
+        onAdd: addRecord,
+        onSave: saveChanges,
+        onDelete: deleteRecord,
+        columns: [
+            { field: 'socio', caption: 'Cliente/Socio/Prov.', size: '25%', sortable: true,
+              resizable: true, editable: {type: 'list', items: listaSocios } },
+            { field: 'fecha', caption: 'Fecha', size: '15%', resizable: true,
+              editable: {type: 'date'} },
+            { field: 'concepto', caption: 'Concepto', size: '25%', resizable: true,
+              editable: { type: 'list', items: conceptos} },
+            { field: 'debe', caption: 'Debe', size: '15%', resizable: true,
+              editable: {type: 'number'}, render: 'float:2' },
+            { field: 'haber', caption: 'Haber', size: '15%', resizable: true,
+              editable: {type: 'number'}, render: 'float:2' },
+            { field: 'obs', caption: 'Observaciones', resizable: true, editable: {type: 'text'} },
+        ],
+        records: []
+    });
+
+    //=========================================================================
+    // Cuenta corriente: master-detail grids
+    //=========================================================================
+    $().w2grid({
+        name: 'saldos',
+        header: 'Lista de saldos',
+        show: { header: true, toolbar: true, footer: true },
+        columns: [
+            { field: 'socio', caption: 'Cliente/Socio/Prov.', size: '75%', sortable: true,
+              resizable: true },
+            { field: 'saldo', caption: 'Saldo', size: '25%', resizable: true, render: 'float:2' },
+        ],
+        onClick: function(event) {
+            showCtaCte(this.get(event.recid).socio);
+        },
+        records: []
+    });
+
+    $().w2grid({
+        name: 'ctacte',
+        header: 'Cuenta corriente',
+        show: { header: true, toolbar: true, footer: true },
+        columns: [
+            { field: 'fecha', caption: 'Fecha', size: '15%', resizable: true },
+            { field: 'concepto', caption: 'Concepto', size: '25%', resizable: true },
+            { field: 'debe', caption: 'Debe', size: '15%', resizable: true, render: 'float:2' },
+            { field: 'haber', caption: 'Haber', size: '15%', resizable: true, render: 'float:2' },
+            { field: 'saldo', caption: 'Saldo', size: '15%', resizable: true, render: 'float:2' },
+            { field: 'obs', caption: 'Observaciones', resizable: true }
+        ],
+        records: []
+    });
+});
+
+//=============================================================================
+// Utilidades
+//=============================================================================
+
+function showInMainLayout(what) {
+    w2ui['layout'].content('main', w2ui[what]);
+    w2ui[what].refresh();
+}
+
+function showSocios()  { showInMainLayout('socios'); }
+function showVuelos()  { showInMainLayout('vuelos'); }
+function showTarifas() { showInMainLayout('tarifas'); }
+function showMovs()    { showInMainLayout('movs'); }
+
+//=============================================================================
+// Muestra contenido de la cuenta corriente de un socio
+//=============================================================================
+function showCtaCte(socio) {
+    var records = [],
+        _saldo = 0.0,
+        n = 1;
+
+    for (let mov of w2ui.movs.records) {
+        if (mov.socio == socio) {
+            _saldo += mov.haber - mov.debe;
+            records.push({
+                recid: n++,
+                fecha: mov.fecha,
+                concepto: mov.concepto,
+                debe: mov.debe,
+                haber: mov.haber,
+                saldo: _saldo,
+                obs: mov.obs
+            });
+        }
+    }
+
+    // show details grid
+    w2ui.ctacte.clear();
+    w2ui.ctacte.header = 'Cuenta corriente: ' + socio;
+    w2ui.ctacte.records = records;
+
+    $('#g2').w2render(w2ui.ctacte);
+    w2ui.ctacte.refresh();
+}
+
+function showSaldos()  {
+    var twogrids =
+    '<div style="position: relative; width: 100%; height: 100%;">' +
+        '<div id="g1" style="position: absolute; left: 0px; width: 24.9%; height: 100%"></div>' +
+        '<div id="g2" style="position: absolute; right: 0px; width: 74.9%; height: 100%"></div>' +
+    '</div>';
+
+    w2ui['layout'].content('main', twogrids);
+
+    w2ui.saldos.clear();
+
+    for (let rec of listaSocios) {
+        var _saldo = 0.0,
+        for (let mov of w2ui.movs.records) {
+            if (mov.socio == socio) {
+                _saldo += mov.haber - mov.debe;
+            }
+        }
+        w2ui.saldos.records.push({recid: rec.id, socio: rec.text, saldo: _saldo});
+    }
+    
+    $('#g1').w2render(w2ui.saldos); // master grid
+}
+
+//=============================================================================
+// Database operations
+//=============================================================================
+var db = null,
+    stores = ['socios', 'vuelos', 'tarifas', 'movs'];
+
+function deleteDB() {
+    var request = indexedDB.deleteDatabase('aerodata');
+}
+
+function openDB() {
+    var request = indexedDB.open('aerodata');
+
+    console.log('In openDB()');
+
+    request.onupgradeneeded = function(event) {
+        db = event.target.result;
+        for (var s of stores) {
+            console.log('creando object store ' + s);
+            db.createObjectStore(s, {keyPath:'recid'});
+        }
+    };
+
+    request.onsuccess = function(event) {
+        db = event.target.result;
+        console.log('DB opened successfull');
+        loadData();
+    };
+
+    request.onerror = function() {
+        console.log('Error opening database');
+    };
+}
+
+function getStore(s) {
+    return db.transaction(s, 'readwrite').objectStore(s);
+}
+
+// Add record in grid and DB
+function addRecord(event) {
+    var record = null,
+        records = w2ui[event.target].records,
+        today = (new Date()).toLocaleString(),
+        maxrecid = 0;
+
+    for (var i=0; i<records.length; i++) {
+        maxrecid = Math.max(records[i].recid, maxrecid);
+    }
+
+    switch (event.target) {
+        case 'socios':
+            record = {
+                recid: maxrecid + 1, nombre: '', dni: "", licencia: "", email: '', desde: '',
+                tipo: tiposSocio[0]
+            };
+            break;
+        case 'vuelos':
+            record = {
+                recid: maxrecid + 1, aeronave: listaAviones[0], piloto: listaSocios[0], tipovuelo: tiposVuelo[0],
+                desde: 'Huinca Renancó', hasta: 'local', salida: today, llegada: today,
+                duracion: 1.0
+            };
+            break;
+        case 'tarifas':
+            record = {
+                recid: maxrecid + 1, aeronave: listaAviones[0], tipovuelo: tiposVuelo[0],
+                vigente: today, importe: 0.0
+            };
+            break;
+        case 'movs':
+            record = {
+                recid: maxrecid + 1, socio: listaSocios[0], fecha: today, concepto: conceptos[0],
+                debe: 0.0, haber: 0.0, obs: ''
+            };
+            break;
+    }
+
+    w2ui[event.target].add(record);
+
+    // save on db
+    var storeId = event.target;
+        store = getStore(storeId),
+        dbrec = {},
+        req;
+
+    for (let fname in record) {
+        if (fname != 'w2ui') {
+            newrec[fname] = record[fname];
+        }
+    }
+    req.add(record);
+    req.onsuccess = function() { console.log('Record added...'); };
+    req.onerror = function() { console.log('Fail on add to db'); };
+}
+
+function deleteRecord(event) {
+    if (!event.force) return;
+
+    var selectedRows = w2ui[event.target].getSelection();
+
+    for (let row of selectedRows) {
+        var store = getStore(event.target);
+        let req = store.delete(row);
+
+        req.onsuccess = function() { console.log('Record deleted...'); };
+        req.onerror = function() { console.log('Error deleting record: ' + row); };
+    }
+}
+
+function saveChanges(event) {
+    console.log(event);
+    var storeId = event.target;
+        store = getStore(storeId);
+
+    // merge changes with record
+    for (let change of event.changes) {
+        var orgrec = w2ui[storeId].get(change.recid),
+            newrec = {};
+
+        console.log('SaveChanges: original record:' + JSON.stringify(orgrec));
+        for (let fname in orgrec) {
+            if (fname != 'w2ui') {
+                newrec[fname] = change[fname] || orgrec[fname];
+            }
+        }
+        console.log('saveChanges: merged record:' + JSON.stringify(newrec));
+
+        let req = store.put(newrec);
+        req.onsuccess = function(event) {
+            console.log('record saved...');
+        };
+        req.onerror = function(event) {
+            console.log('error saving data in store ' + event.target);
+        };
+    }
+
+    w2ui[storeId].mergeChanges();
+
+    if (storeId == 'socios') {
+        updateListaSocios();
+    }
+}
+
+function loadData() {
+    console.log('loading data...');
+
+    for (let s of stores) {
+        var get = getStore(s).getAll();
+
+        get.onsuccess = function(event) {
+            console.log('reading from store ' + s);
+            if (event.target.result) {
+                console.log('records: ' + event.target.result);
+                w2ui[s].records = event.target.result;
+            }
+            if (s == 'socios') {
+                updateListaSocios();
+            }
+        }
+
+        get.onerror = function(event) {
+            console.log('Error loading data from store ' + s);
+        }
+    }
+}
+
+// load data from DB
+openDB();
+// deleteDB();
+</script>
+
+</body>
+</html>
