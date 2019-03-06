@@ -311,7 +311,7 @@ function showSaldos()  {
     w2ui.saldos.clear();
 
     for (let rec of listaSocios) {
-        var _saldo = 0.0,
+        var _saldo = 0.0;
         for (let mov of w2ui.movs.records) {
             if (mov.socio == socio) {
                 _saldo += mov.haber - mov.debe;
@@ -319,7 +319,7 @@ function showSaldos()  {
         }
         w2ui.saldos.records.push({recid: rec.id, socio: rec.text, saldo: _saldo});
     }
-    
+
     $('#g1').w2render(w2ui.saldos); // master grid
 }
 
