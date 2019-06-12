@@ -1,2 +1,2 @@
 # aerodata
-Sistema de gestión de aeroclub
+Sistema de gestión de Aeroclub Huinca Renancó
