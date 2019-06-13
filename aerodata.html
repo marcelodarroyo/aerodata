@@ -20,14 +20,15 @@
 
 <script type="text/javascript">
 var db = null,
-    stores = ['socios', 'vuelos', 'tarifas', 'conceptos', 'movs'];
+    stores = ['socios', 'vuelos', 'combustible', 'tarifas', 'conceptos', 'movs'];
 
 var tiposSocio = [
     { id: 1, text: "Piloto" },
     { id: 2, text: "Alumno piloto" },
     { id: 3, text: "Socio" },
     { id: 4, text: "Cliente/Proveedor" },
-    { id: 1000, text: "Otro"}
+    { id: 1000, text: "Cuenta"},
+    { id: 2000, text: "Otro"}
 ];
 
 var listaSocios = [];
@@ -39,12 +40,23 @@ var listaAviones = [
     { id: 1000, text: "Otro"}
 ];
 
+// Lista de depósitos de combustible
+var listaDepComb = [
+    { id: 1, text: "Cisterna" },
+    { id: 2, text: "LV-YRE" },
+    { id: 3, text: "LV-MIR" },
+    { id: 4, text: "LV-GZG"},
+    { id: 1000, text: "Otro"}
+];
+
 var tiposVuelo = [
     { id: 1, text: "Piloto" },
     { id: 2, text: "Con instructor" },
     { id: 3, text: "Alumno piloto" },
-    { id: 4, text: "Bautismo" },
-    { id: 5, text: "Terceros" },
+    { id: 4, text: "Adaptación" },
+    { id: 5, text: "Re-adaptación" },
+    { id: 6, text: "Bautismo" },
+    { id: 7, text: "Terceros" },
     { id: 1000, text: "Otro" }
 ];
 
@@ -79,6 +91,8 @@ $(function () {
             { id: 'socios', text: 'Socios/Prov', img: 'icon-folder', onClick: showSocios },
             { id: 'vuelos', text: 'Vuelos', img: 'icon-folder', onClick: showVuelos },
             { id: 'tarifas', text: 'Tarifas', img: 'icon-folder', onClick: showTarifas },
+            { id: 'combustible', text: 'Combustible', img: 'icon-folder',
+              onClick: showCombustible },
             { id: 'conceptos', text: 'Conceptos', img: 'icon-folder', onClick: showConceptos },
             { id: 'movs', text: 'Movimientos', img: 'icon-folder', onClick: showMovs },
             { id: 'ctacte', text: 'Ctas. Ctes.', img: 'icon-folder', onClick: showSaldos }
@@ -127,13 +141,21 @@ $(function () {
         header: 'Vuelos',
         show: { header: true, toolbar: true, footer: true, toolbarAdd: true, toolbarDelete: true,
                 toolbarSave: true },
+        toolbar: {
+            items: [
+                { type: 'break' },
+                { type: 'button', id: 'genMovs', caption: 'Debitar', img: 'icon-folder',
+                  hint: 'Generar movimientos (débitos) de los vuelos seleccionados' }
+            ],
+            onClick: debitarVuelos
+        },
         searches: [{ field: 'piloto', caption: 'Apellido', type: 'text' },
                    { field: 'desde', direction: 'ASC'}],
         sortData: [{ field: 'piloto', direction: 'ASC' }, { field: 'desde', direction: 'ASC'}],
         onAdd: addDefaultRecord,
         onSave: saveChanges,
         onDelete: deleteRecords,
-        onChange: onEditVuelo,
+        onChange: calcDuracion,
         columns: [
             { field: 'aeronave', caption: 'Aeronave', size: '10%', sortable: true,
               resizable: true, editable: {type: 'list', items: listaAviones} },
@@ -145,16 +167,49 @@ $(function () {
               editable: {type: 'text'} },
             { field: 'hasta', caption: 'Hasta', size: '10%', resizable: true,
               editable: {type: 'text'} },
+            { field: 'aterrizajes', caption: 'Aterrizajes', size: '10%', resizable: true,
+              editable: {type: 'int'} },
             { field: 'odomant', caption: 'Odom. Ant.', size: '10%', resizable: true,
-              editable: {type: 'number'}, render: 'int'},
+              editable: {type: 'int'} },
             { field: 'odomact', caption: 'Odom. Actual', size: '10%', resizable: true,
-              editable: {type: 'number'}, render: 'int'},
+              editable: {type: 'int'} },
             { field: 'duracion', caption: 'Duración', size: '10%', resizable: true,
               render: 'float:1' },
             { field: 'salida', caption: 'Hora salida', size: '15%', resizable: true,
               editable: {type: 'datetime'} },
             { field: 'llegada', caption: 'Hora llegada', size: '15%', resizable: true,
-              render: 'datetime'}
+              render: 'datetime' }
+        ],
+        records: []
+    });
+
+    //=========================================================================
+    // Combustible
+    //=========================================================================
+    $().w2grid({
+        name: 'combustible',
+        header: 'Combustible',
+        show: { header: true, toolbar: true, footer: true, toolbarAdd: true, toolbarDelete: true,
+                toolbarSave: true },
+        searches: [{ field: 'piloto', caption: 'Apellido', type: 'text' },
+                   { field: 'desde', direction: 'ASC'}],
+        sortData: [{ field: 'piloto', direction: 'ASC' }, { field: 'desde', direction: 'ASC'}],
+        onAdd: addDefaultRecord,
+        onSave: saveChanges,
+        onDelete: deleteRecords,
+        onChange: calcLitrosCisterna,
+        columns: [
+            { field: 'fecha', caption: 'Fecha', size: '15%', resizable: true,
+              editable: {type: 'date'} },
+            { field: 'origen', caption: 'Origen', size: '20%', resizable: true,
+              editable: {type: 'list', items: listaDepComb} },
+            { field: 'destino', caption: 'Destino', size: '20%', resizable: true,
+              editable: {type: 'list', items: listaDepComb} },
+            { field: 'litros', caption: 'Litros', size: '15%', resizable: true,
+              editable: {type: 'number'} },
+            { field: 'remanente', caption: 'Remanente', size: '15%', resizable: true,
+              editable: {type: 'number'} },
+            { field: 'obs', caption: 'Observaciones', resizable: true, editable: {type: 'text'} },
         ],
         records: []
     });
@@ -217,12 +272,14 @@ $(function () {
               resizable: true, editable: {type: 'list', items: listaSocios } },
             { field: 'fecha', caption: 'Fecha', size: '15%', resizable: true,
               editable: {type: 'date'} },
-            { field: 'concepto', caption: 'Concepto', size: '25%', resizable: true,
+            { field: 'concepto', caption: 'Concepto', size: '30%', resizable: true,
               editable: { type: 'list', items: listaConceptos} },
             { field: 'debe', caption: 'Debe', size: '15%', resizable: true,
               editable: {type: 'number'}, render: 'float:2' },
             { field: 'haber', caption: 'Haber', size: '15%', resizable: true,
               editable: {type: 'number'}, render: 'float:2' },
+            { field: 'ref', caption: 'Referencia', size: '25%', resizable: true,
+              editable: {type: 'text'} },
             { field: 'obs', caption: 'Observaciones', resizable: true, editable: {type: 'text'} },
         ],
         records: []
@@ -263,7 +320,8 @@ $(function () {
 
     // Open database and load data into grids
     db = new idxDB({name: 'aerodata', stores: stores});
-    db.openDB();
+    // db.openDB();
+    db.openDB(2); // open version 2: create store 'combustible'
     db.onOpen = loadData;
 });
 
@@ -275,11 +333,12 @@ function showInMainLayout(what) {
     w2ui[what].refresh();
 }
 
-function showSocios()    { showInMainLayout('socios'); }
-function showVuelos()    { updateListaSocios(); showInMainLayout('vuelos'); }
-function showTarifas()   { showInMainLayout('tarifas'); }
-function showConceptos() { showInMainLayout('conceptos'); }
-function showMovs()      {
+function showSocios()      { showInMainLayout('socios'); }
+function showVuelos()      { updateListaSocios(); showInMainLayout('vuelos'); }
+function showCombustible() { showInMainLayout('combustible'); }
+function showTarifas()     { showInMainLayout('tarifas'); }
+function showConceptos()   { showInMainLayout('conceptos'); }
+function showMovs() {
     updateListaSocios();
     updateListaConceptos();
     showInMainLayout('movs');
@@ -361,8 +420,14 @@ function addDefaultRecord(event) {
           break;
       case 'vuelos':
           record = {
-              recid: maxrecid, aeronave: listaAviones[0], piloto: listaSocios[0], tipovuelo: tiposVuelo[0], desde: 'Huinca Renancó', hasta: 'local',
+              recid: maxrecid, aeronave: listaAviones[0], piloto: listaSocios[0], tipovuelo: tiposVuelo[0], desde: 'Huinca Renancó', hasta: 'local', aterrizajes: 1,
               odomant: 0, odomact: 0, duracion: 1.0, salida: today, llegada: today
+          };
+          break;
+      case 'combustible':
+          record = {
+              recid: maxrecid, fecha: today, origen: listaDepComb[0], destino: listaDepComb[1],
+              litros: 0, remanente: 0, obs: ''
           };
           break;
       case 'tarifas':
@@ -379,7 +444,7 @@ function addDefaultRecord(event) {
       case 'movs':
           record = {
               recid: maxrecid, socio: listaSocios[0], fecha: today, concepto: conceptos[0],
-              debe: 0.0, haber: 0.0, obs: ''
+              debe: 0.0, haber: 0.0, ref: '', obs: ''
           };
           break;
   }
@@ -410,10 +475,15 @@ function saveChanges(event) {
             newrec = {};
 
         console.log('SaveChanges: original record:' + JSON.stringify(orgrec));
+        // copy original values in new record
         for (let fname in orgrec) {
             if (fname != 'w2ui') {
-                newrec[fname] = changed[fname] || orgrec[fname];
+                newrec[fname] = orgrec[fname];
             }
+        }
+        // copy changes
+        for (let fname in changed) {
+            newrec[fname] = changed[fname];
         }
         console.log('saveChanges: merged record:' + JSON.stringify(newrec));
 
@@ -424,25 +494,32 @@ function saveChanges(event) {
 }
 
 // calcula la duración del vuelo y hora de llegada dada la diferencia del odómetro
-function onEditVuelo(event) {
-    console.log('Editing vuelo: ' + JSON.stringify(event));
-    if (event.column == 5 || event.column == 6 || event.column == 8)
-    var odomant  = w2ui['vuelos'].getCellValue(event.index, 5),
-        odomact  = w2ui['vuelos'].getCellValue(event.index, 6),
-        odomdiff = odomact - odomant,
-        minutes = odomdiff * 0.6,
-        hourPercent = (minutes / 60).toFixed(1),
-        llegada = w2ui['vuelos'].getCellValue(event.index, 8),
-        salida = new Date(w2ui['vuelos'].getCellValue(event.index, 8)),
-        llegada = new Date(salida);
+function calcDuracion(event) {
+    if (event.column == 9) {
+        var odomant  = w2ui['vuelos'].getCellValue(event.index, 6),
+            odomact  = w2ui['vuelos'].getCellValue(event.index, 7),
+            odomdiff = odomact - odomant,
+            minutes = odomdiff * 0.6,
+            hourPercent = (minutes / 60).toFixed(1),
+            salida = new Date(w2ui['vuelos'].getCellValue(event.index, 9)),
+            llegada = new Date(salida);
 
         llegada.setMinutes(salida.getMinutes() + minutes);
 
-    console.log('odomdiff: ' + odomdiff);
-    console.log('minutes: ' + minutes);
-    console.log('duracion: ' + hourPercent);
-    w2ui['vuelos'].set(event.recid, {duracion: hourPercent});
-    w2ui['vuelos'].set(event.recid, {llegada: llegada});
+        console.log('odomdiff: ' + odomdiff);
+        console.log('minutes: ' + minutes);
+        w2ui['vuelos'].set(event.recid, {duracion: hourPercent});
+        w2ui['vuelos'].set(event.recid, {llegada: llegada});
+    }
+}
+
+// Calcula los litros remanentes en la cisterna
+function calcLitrosCisterna(event) {
+        // to do...
+}
+
+// Debitar los vuelos seleccionados
+function debitarVuelos() {
 }
 
 // Muestra contenido de la cuenta corriente de un socio
